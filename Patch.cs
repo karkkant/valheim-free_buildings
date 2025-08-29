@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using System.Linq;
+using HarmonyLib;
 using UnityEngine;
 
 namespace FreeBuildings
@@ -7,26 +8,49 @@ namespace FreeBuildings
     public class Patch
     {
         [HarmonyPostfix]
-        [HarmonyPatch(typeof(ObjectDB), "Awake")]
+        [HarmonyPatch(typeof(ObjectDB), nameof(ObjectDB.Awake))]
         public static void PatchBuildingPieceCost(ref ObjectDB __instance)
         {
-            UnityEngine.Object[] array = Resources.FindObjectsOfTypeAll(typeof(GameObject));
-
-            for (int i = 0; i < array.Length; i++)
+            if (!Plugin.UnlockAllBuildPiecesEnabled)
             {
-                GameObject val = (GameObject)array[i];
+                return;
+            }
+
+            UnityEngine.Object[] resources = Resources.FindObjectsOfTypeAll(typeof(GameObject));
+
+            for (int i = 0; i < resources.Length; i++)
+            {
+                GameObject val = (GameObject)resources[i];
 
                 Piece piece;
                 if (val.TryGetComponent<Piece>(out piece))
                 {
                     if (piece.m_category == Piece.PieceCategory.BuildingWorkbench || piece.m_category == Piece.PieceCategory.BuildingStonecutter)
                     {
-                        for (int j = 0; j < piece.m_resources.Length; j++)
-                        {
-                            piece.m_resources[j].m_amount = 0;
-                        }
+                        SetPrice(piece);
                     }
                 }
+            }
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPatch(typeof(PieceTable), nameof(PieceTable.UpdateAvailable))]
+        public static void PatchKnownBuildPieces(ref PieceTable __instance)
+        {
+            if (Plugin.UnlockAllBuildPiecesEnabled)
+            {
+                return;
+            }
+
+            __instance.m_availablePieces[(int)Piece.PieceCategory.BuildingWorkbench].ForEach(p => SetPrice(p));
+            __instance.m_availablePieces[(int)Piece.PieceCategory.BuildingStonecutter].ForEach(p => SetPrice(p));
+        }
+
+        private static void SetPrice(Piece piece)
+        {
+            foreach (var resource in piece.m_resources)
+            {
+                resource.m_amount = 0;
             }
         }
     }
