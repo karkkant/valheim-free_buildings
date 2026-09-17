@@ -10,7 +10,7 @@ namespace FreeBuildings
     {
         const string pluginId = "org.bepinex.plugins.free-buildings";
         const string pluginName = "Free Buildings";
-        const string pluginVersion = "1.0.1";
+        const string pluginVersion = "1.0.2";
         
         private readonly Harmony _harmony = new Harmony(pluginId);
 

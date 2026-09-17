@@ -7,28 +7,21 @@ namespace FreeBuildings
     [HarmonyPatch]
     public class Patch
     {
-        [HarmonyPostfix]
-        [HarmonyPatch(typeof(ObjectDB), nameof(ObjectDB.Awake))]
-        public static void PatchBuildingPieceCost(ref ObjectDB __instance)
+        [HarmonyPrefix]
+        [HarmonyPatch(typeof(PieceTable), nameof(PieceTable.UpdateAvailable))]
+        public static void UnlockKnownBuildPieces(ref PieceTable __instance)
         {
-            if (!Plugin.UnlockAllBuildPiecesEnabled)
+            if (!Plugin.UnlockAllBuildPiecesEnabled) return;
+
+            foreach(var obj in __instance.m_pieces)
             {
-                return;
-            }
+                Piece piece = obj.GetComponent<Piece>();
 
-            UnityEngine.Object[] resources = Resources.FindObjectsOfTypeAll(typeof(GameObject));
-
-            for (int i = 0; i < resources.Length; i++)
-            {
-                GameObject val = (GameObject)resources[i];
-
-                Piece piece;
-                if (val.TryGetComponent<Piece>(out piece))
+                if (piece.m_category == Piece.PieceCategory.BuildingWorkbench ||
+                    piece.m_category == Piece.PieceCategory.BuildingStonecutter ||
+                    (piece.m_category == Piece.PieceCategory.DeepNorth && piece.m_usage.HasFlag(Piece.UsageTagFlags.Building)))
                 {
-                    if (piece.m_category == Piece.PieceCategory.BuildingWorkbench || piece.m_category == Piece.PieceCategory.BuildingStonecutter)
-                    {
-                        SetPrice(piece);
-                    }
+                    SetPrice(piece);
                 }
             }
         }
@@ -37,13 +30,18 @@ namespace FreeBuildings
         [HarmonyPatch(typeof(PieceTable), nameof(PieceTable.UpdateAvailable))]
         public static void PatchKnownBuildPieces(ref PieceTable __instance)
         {
-            if (Plugin.UnlockAllBuildPiecesEnabled)
-            {
-                return;
-            }
+            if (Plugin.UnlockAllBuildPiecesEnabled) return;
 
-            __instance.m_availablePieces[(int)Piece.PieceCategory.BuildingWorkbench].ForEach(p => SetPrice(p));
-            __instance.m_availablePieces[(int)Piece.PieceCategory.BuildingStonecutter].ForEach(p => SetPrice(p));
+            __instance.m_availablePiecesByCategory[(int)Piece.PieceCategory.BuildingWorkbench].ForEach(p => SetPrice(p));
+            __instance.m_availablePiecesByCategory[(int)Piece.PieceCategory.BuildingStonecutter].ForEach(p => SetPrice(p));
+
+            foreach (var item in __instance.m_availablePiecesByCategory[(int)Piece.PieceCategory.DeepNorth])
+            {
+                if(item.m_usage.HasFlag(Piece.UsageTagFlags.Building))
+                {
+                    SetPrice(item);
+                }
+            }
         }
 
         private static void SetPrice(Piece piece)
